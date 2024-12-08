@@ -14,9 +14,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "express": "^4.21.1",
+    "google-auth-library": "^9.15.0",
     "mssql": "^11.0.1"
-  },
-  "devDependencies": {}
-  
+  }
 }
