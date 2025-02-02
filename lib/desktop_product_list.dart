@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'configuration.dart';
+
 class DesktopProductList extends StatefulWidget {
   @override
   _DesktopProductListState createState() => _DesktopProductListState();
@@ -30,7 +32,7 @@ class _DesktopProductListState extends State<DesktopProductList> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.0.109:3000/products?offset=$_offset&limit=$_limit'),
+        Uri.parse('http://${Configuration.ip_adress}:${Configuration.port}/products?offset=$_offset&limit=$_limit'),
       );
 
       if (response.statusCode == 200) {
@@ -58,7 +60,7 @@ class _DesktopProductListState extends State<DesktopProductList> {
   Future<List<String>> _fetchProductImages(int productId) async {
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.0.109:3000/productImages?productId=$productId'),
+        Uri.parse('http://${Configuration.ip_adress}:${Configuration.port}/productImages?productId=$productId'),
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',

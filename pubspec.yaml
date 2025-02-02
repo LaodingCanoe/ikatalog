@@ -8,7 +8,10 @@ environment:
   sdk: ^3.5.3
 
 dependencies:
+  google_sign_in: ^5.0.7
+  image_picker: ^0.8.5+3
   flutter_spinkit: ^5.2.1
+  shared_preferences: ^2.1.2
   flutter:
     sdk: flutter
   http: ^1.2.2
@@ -48,6 +51,7 @@ flutter:
     - assets/images/search/touch/android/search.png
     - assets/images/heart/touch/android/heart.png
     - assets/images/bell/touch/android/bell.png  
+    - assets/defolt_logo.jpg
 
   fonts:
     - family: Roboto

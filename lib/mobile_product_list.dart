@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
-import 'image_carousel.dart'; // Подключение библиотеки для карусели
+import 'image_carousel.dart'; // Ensure this is implemented correctly
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'authorization.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'user_list.dart';
+import 'configuration.dart';
+
 
 class MobileProductList extends StatefulWidget {
+  MobileProductList({Key? key}) : super(key: key);
+
   @override
   _MobileProductListState createState() => _MobileProductListState();
 }
@@ -14,6 +21,7 @@ class _MobileProductListState extends State<MobileProductList> {
   bool _isLoading = false;
   bool _hasMore = true;
   final int _limit = 50;
+  Map<String, dynamic>? _user; // No longer final, now we manage user state here
 
   @override
   void initState() {
@@ -21,6 +29,7 @@ class _MobileProductListState extends State<MobileProductList> {
     _fetchProducts();
   }
 
+  // Method to fetch products from the server
   Future<void> _fetchProducts() async {
     if (_isLoading || !_hasMore) return;
 
@@ -30,7 +39,7 @@ class _MobileProductListState extends State<MobileProductList> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.0.109:3000/products?offset=$_offset&limit=$_limit'),
+        Uri.parse('http://${Configuration.ip_adress}:${Configuration.port}/products?offset=$_offset&limit=$_limit'),
       );
 
       if (response.statusCode == 200) {
@@ -44,10 +53,10 @@ class _MobileProductListState extends State<MobileProductList> {
           }
         });
       } else {
-        throw Exception('Не удалось загрузить продукты: ${response.statusCode}');
+        throw Exception('Failed to load products: ${response.statusCode}');
       }
     } catch (e) {
-      print('Ошибка при загрузке продуктов: $e');
+      print('Error loading products: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -55,10 +64,11 @@ class _MobileProductListState extends State<MobileProductList> {
     }
   }
 
+  // Method to fetch product images
   Future<List<String>> _fetchProductImages(int productId) async {
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.0.109:3000/productImages?productId=$productId'),
+        Uri.parse('http://${Configuration.ip_adress}:${Configuration.port}/productImages?productId=$productId'),
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
@@ -77,6 +87,25 @@ class _MobileProductListState extends State<MobileProductList> {
     }
   }
 
+  // Update user data after successful login
+void _updateUser(Map<String, dynamic> newUser) async {
+  setState(() {
+    _user = newUser; // Update the user data state
+  });
+
+  // Save avatar URL to SharedPreferences
+  final prefs = await SharedPreferences.getInstance();
+  prefs.setString('avatarUrl', newUser['avatarUrl'] ?? '');
+}
+void _loadUserAvatar() async {
+  final prefs = await SharedPreferences.getInstance();
+  final avatarUrl = prefs.getString('avatarUrl');
+  setState(() {
+    _user = avatarUrl != null ? {'avatarUrl': avatarUrl} : null;
+  });
+}
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -84,10 +113,10 @@ class _MobileProductListState extends State<MobileProductList> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Строка поиска
+            // Search bar
             Container(
-              height: 40,
-              width: MediaQuery.of(context).size.width * 0.8 , // Уменьшаем ширину
+              height: 50,
+              width: MediaQuery.of(context).size.width * 0.7,
               decoration: BoxDecoration(
                 color: Colors.grey[300],
                 borderRadius: BorderRadius.circular(30),
@@ -101,7 +130,7 @@ class _MobileProductListState extends State<MobileProductList> {
                     Expanded(
                       child: TextField(
                         decoration: InputDecoration(
-                          hintText: 'Поиск...',
+                          hintText: 'Найти iPhone',
                           border: InputBorder.none,
                         ),
                       ),
@@ -110,20 +139,57 @@ class _MobileProductListState extends State<MobileProductList> {
                 ),
               ),
             ),
-            // Кнопка аккаунта
-            IconButton(
-              icon: Icon(Icons.account_circle),
-              onPressed: () {
-                // Логика для кнопки аккаунта
-              },
-            ),
+            // User avatar or icon
+IconButton(
+  icon: _user != null && _user!['avatarUrl'] != null
+      ? CircleAvatar(
+          radius: 20,
+          backgroundImage: NetworkImage(_user!['avatarUrl']),
+        )
+      : CircleAvatar(
+          radius: 20,
+          backgroundImage: AssetImage('assets/defolt_logo.jpg'),
+        ),
+  onPressed: () {
+    if (_user != null) {
+      // Если пользователь авторизован, переходим на экран UserListScreen
+      Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => UserListScreen(
+      onLogout: () {
+        setState(() {
+          _user = null; // Удаляем данные пользователя из состояния
+        });
+      },
+    ),
+  ),
+);
+
+    } else {
+      // Если пользователь не авторизован, переходим на экран авторизации
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AuthScreen(
+            onLoginSuccess: _updateUser, // Callback для обновления состояния
+          ),
+        ),
+      );
+    }
+  },
+)
+
+
+
           ],
         ),
       ),
+
       body: NotificationListener<ScrollNotification>(
         onNotification: (ScrollNotification scrollInfo) {
           if (scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent && !_isLoading) {
-            _fetchProducts();
+            _fetchProducts(); // Fetch more products when scrolled to the bottom
           }
           return true;
         },
@@ -133,7 +199,7 @@ class _MobileProductListState extends State<MobileProductList> {
             crossAxisCount: 2,
             mainAxisSpacing: 8.0,
             crossAxisSpacing: 8.0,
-            childAspectRatio: 0.43, // Увеличиваем высоту карточки
+            childAspectRatio: 0.43, // Adjust card height
           ),
           itemCount: _products.length + (_hasMore ? 1 : 0),
           itemBuilder: (context, index) {
@@ -161,7 +227,7 @@ class _MobileProductListState extends State<MobileProductList> {
               margin: EdgeInsets.zero,
               child: Column(
                 children: [
-                  // Карусель изображений
+                  // Image carousel
                   Stack(
                     children: [
                       FutureBuilder<List<String>>(
@@ -178,7 +244,7 @@ class _MobileProductListState extends State<MobileProductList> {
                             );
                           } else {
                             return ProductImageCarousel(
-                              imageUrls: snapshot.data!, // Увеличиваем высоту карусели
+                              imageUrls: snapshot.data!, // Use image URLs in carousel
                             );
                           }
                         },
@@ -201,11 +267,11 @@ class _MobileProductListState extends State<MobileProductList> {
                         ),
                     ],
                   ),
-                  // Цена продукта
+                  // Product price
                   Padding(
                     padding: const EdgeInsets.all(4.0),
                     child: Align(
-                      alignment: Alignment.centerLeft, // Цена по левому краю
+                      alignment: Alignment.centerLeft,
                       child: Text(
                         '$price ₽',
                         style: TextStyle(
@@ -216,7 +282,7 @@ class _MobileProductListState extends State<MobileProductList> {
                       ),
                     ),
                   ),
-                  // Информация о продукте
+                  // Product info
                   Padding(
                     padding: const EdgeInsets.all(4.0),
                     child: Column(
@@ -258,13 +324,13 @@ class _MobileProductListState extends State<MobileProductList> {
                       ],
                     ),
                   ),
-                  // Кнопка "В корзину"
+                  // Add to cart button
                   Container(
                     margin: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        // Логика добавления в корзину
+                        // Add to cart logic
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Color(0xFF4D7B4A),
